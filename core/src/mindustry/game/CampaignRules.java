@@ -19,5 +19,6 @@ public class CampaignRules{
         rules.teams.get(rules.waveTeam).unitHealthMultiplier = difficulty.enemyHealthMultiplier;
         rules.teams.get(rules.waveTeam).unitCostMultiplier = 1f / difficulty.enemySpawnMultiplier;
         rules.teams.get(rules.waveTeam).unitBuildSpeedMultiplier = difficulty.enemySpawnMultiplier;
+        rules.teams.get(rules.waveTeam).unitDamageMultiplier = difficulty.playerDamageMultiplier;
     }
 }

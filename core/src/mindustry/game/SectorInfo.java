@@ -41,8 +41,10 @@ public class SectorInfo{
     public int storageCapacity = 0;
     /** Whether a core is available here. */
     public boolean hasCore = true;
-    /** Whether a world processor is on this map - implies that the map will get cleared. */
-    public boolean hasWorldProcessor;
+    /** Last sector preset name set to this sector. */
+    public @Nullable String lastPresetName;
+    /** Last size of the map. */
+    public int lastWidth, lastHeight;
     /** Whether this sector was ever fully captured. */
     public boolean wasCaptured = false;
     /** Sector that was launched from. */
@@ -73,6 +75,8 @@ public class SectorInfo{
     public float secondsPassed;
     /** How many minutes this sector has been captured. */
     public float minutesCaptured;
+    /** Light coverage in terms of radius. */
+    public float lightCoverage;
     /** Display name. */
     public @Nullable String name;
     /** Displayed icon. */
@@ -101,6 +105,14 @@ public class SectorInfo{
     private @Nullable transient int[] coreDeltas;
     /** Core item storage input/output deltas. */
     private @Nullable transient int[] productionDeltas;
+
+    /** @return whether the sector was last saved with the same preset. if false, this means the preset changed, and thus the spawn/plan data should be discarded. */
+    public boolean sectorDataMatches(Sector sector){
+        if(sector.preset != null && (sector.preset.generator.map.width != lastWidth || sector.preset.generator.map.height != lastHeight)){
+            return false;
+        }
+        return Structs.eq(sector.preset == null ? null : sector.preset.name, lastPresetName);
+    }
 
     /** Handles core item changes. */
     public void handleCoreItem(Item item, int amount){
@@ -196,7 +208,7 @@ public class SectorInfo{
     }
 
     /** Prepare data for writing to a save. */
-    public void prepare(){
+    public void prepare(Sector sector){
         //update core items
         items.clear();
 
@@ -211,7 +223,6 @@ public class SectorInfo{
             spawnPosition = entity.pos();
         }
 
-        hasWorldProcessor = state.teams.present.contains(t -> t.getBuildings(Blocks.worldProcessor).any());
         waveSpacing = state.rules.waveSpacing;
         wave = state.wave;
         winWave = state.rules.winWave;
@@ -224,6 +235,18 @@ public class SectorInfo{
         wavesPassed = 0;
         damage = 0;
         hasSpawns = spawner.countSpawns() > 0;
+        lastPresetName = sector.preset == null ? null : sector.preset.name;
+        lastWidth = world.width();
+        lastHeight = world.height();
+
+        lightCoverage = 0f;
+        for(var build : state.rules.defaultTeam.data().buildings){
+            if(build.block.emitLight){
+                lightCoverage += build.block.lightRadius * build.efficiency;
+            }
+        }
+
+        lightCoverage += state.rules.defaultTeam.data().units.sumf(u -> u.type.lightRadius/2f);
 
         //cap production at raw production.
         production.each((item, stat) -> {
@@ -237,12 +260,14 @@ public class SectorInfo{
             export.clear();
         }
 
-        if(state.rules.sector != null){
-            state.rules.sector.saveInfo();
+        sector.saveInfo();
+
+        if(sector.planet.allowWaveSimulation){
+            SectorDamage.writeParameters(sector);
         }
 
-        if(state.rules.sector != null && state.rules.sector.planet.allowWaveSimulation){
-            SectorDamage.writeParameters(this);
+        if(sector.planet.generator != null){
+            sector.planet.generator.beforeSaveWrite(sector);
         }
     }
 

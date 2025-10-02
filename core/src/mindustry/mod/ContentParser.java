@@ -136,6 +136,8 @@ public class ContentParser{
         put(BulletType.class, (type, data) -> {
             if(data.isString()){
                 return field(Bullets.class, data);
+            }else if(data.isArray()){
+                return new MultiBulletType(parser.readValue(BulletType[].class, data));
             }
             Class<?> bc = resolve(data.getString("type", ""), BasicBulletType.class);
             data.remove("type");
@@ -661,6 +663,8 @@ public class ContentParser{
 
             Planet parent = locate(ContentType.planet, value.getString("parent", ""));
             Planet planet = new Planet(mod + "-" + name, parent, value.getFloat("radius", 1f), value.getInt("sectorSize", 0));
+
+            value.remove("sectorSize");
 
             if(value.has("mesh")){
                 var mesh = value.get("mesh");

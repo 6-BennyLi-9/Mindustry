@@ -10,12 +10,14 @@ import arc.math.geom.*;
 import arc.struct.*;
 import arc.util.*;
 import arc.util.io.*;
+import mindustry.audio.*;
 import mindustry.content.*;
 import mindustry.core.*;
 import mindustry.entities.*;
 import mindustry.entities.Units.*;
 import mindustry.entities.bullet.*;
 import mindustry.entities.pattern.*;
+import mindustry.entities.units.*;
 import mindustry.game.EventType.*;
 import mindustry.game.*;
 import mindustry.gen.*;
@@ -23,6 +25,7 @@ import mindustry.graphics.*;
 import mindustry.logic.*;
 import mindustry.type.*;
 import mindustry.ui.*;
+import mindustry.world.*;
 import mindustry.world.blocks.*;
 import mindustry.world.draw.*;
 import mindustry.world.meta.*;
@@ -62,6 +65,8 @@ public class Turret extends ReloadTurret{
     public float shootX = 0f, shootY = Float.NEGATIVE_INFINITY;
     /** Random spread on the X axis. */
     public float xRand = 0f;
+    /** If true, a range ring is also drawn for minRange. */
+    public boolean drawMinRange;
     /** Range at which it finds and locks on to the target, but does not shoot. */
     public float trackingRange = 0f;
     /** Minimum bullet range. Used for artillery only. */
@@ -116,6 +121,10 @@ public class Turret extends ReloadTurret{
     public Sound shootSound = Sounds.shoot;
     /** Sound emitted when shoot.firstShotDelay is >0 and shooting begins. */
     public Sound chargeSound = Sounds.none;
+    /** The sound that this block makes while active. One sound loop. Do not overuse. */
+    public Sound loopSound = Sounds.none;
+    /** Active sound base volume. */
+    public float loopSoundVolume = 0.5f;
     /** Range for pitch of shoot sound. */
     public float soundPitchMin = 0.9f, soundPitchMax = 1.1f;
     /** Backwards Y offset of ammo eject effect. */
@@ -145,10 +154,16 @@ public class Turret extends ReloadTurret{
     public Turret(String name){
         super(name);
         liquidCapacity = 20f;
-        quickRotate = false;
         outlinedIcon = 1;
         drawLiquidLight = false;
         sync = true;
+        rotate = true;
+        quickRotate = false;
+        drawArrow = false;
+        rotateDrawEditor = false;
+        visualRotationOffset = -90f;
+        regionRotated1 = 1;
+        regionRotated2 = 2;
     }
 
     @Override
@@ -189,6 +204,10 @@ public class Turret extends ReloadTurret{
         if(cooldownTime < 0f) cooldownTime = reload;
         if(newTargetInterval <= 0f) newTargetInterval = targetInterval;
 
+        if(!targetGround){
+            disableOverlapCheck = true;
+        }
+
         super.init();
         trackingRange = Math.max(range, trackingRange);
     }
@@ -198,6 +217,11 @@ public class Turret extends ReloadTurret{
         super.load();
 
         drawer.load(this);
+    }
+
+    @Override
+    public void drawPlanRegion(BuildPlan plan, Eachable<BuildPlan> list){
+        drawer.drawPlan(this, plan, list);
     }
 
     @Override
@@ -213,13 +237,30 @@ public class Turret extends ReloadTurret{
     public void limitRange(BulletType bullet, float margin){
         float realRange = bullet.rangeChange + range;
         //doesn't handle drag
-        bullet.lifetime = (realRange + margin + bullet.extraRangeMargin) / bullet.speed;
+        bullet.lifetime = (realRange + margin + bullet.extraRangeMargin + 10f) / bullet.speed;
+    }
+
+    @Override
+    public void drawPlace(int x, int y, int rotation, boolean valid){
+        super.drawPlace(x, y, rotation, valid);
+
+        if(drawMinRange){
+            Drawf.dashCircle(x * tilesize + offset, y * tilesize + offset, minRange, Pal.placing);
+        }
     }
 
     public static abstract class AmmoEntry{
         public int amount;
 
         public abstract BulletType type();
+    }
+
+    @Override
+    public void placeEnded(Tile tile, @Nullable Unit builder, int rotation, @Nullable Object config){
+        super.placeEnded(tile, builder, rotation, config);
+        if(rotate && tile.build instanceof TurretBuild turret){
+            turret.rotation = tile.build.rotdeg();
+        }
     }
 
     public class TurretBuild extends ReloadTurretBuild implements ControlBlock{
@@ -243,12 +284,37 @@ public class Turret extends ReloadTurret{
         public float heatReq;
         public float[] sideHeat = new float[4];
 
+        public @Nullable SoundLoop soundLoop = (loopSound == Sounds.none ? null : new SoundLoop(loopSound, loopSoundVolume));
+
         float lastRangeChange;
+
+        @Override
+        public void remove(){
+            super.remove();
+            if(soundLoop != null){
+                soundLoop.stop();
+            }
+        }
+
+        @Override
+        public void onDestroyed(){
+            super.onDestroyed();
+            if(soundLoop != null){
+                soundLoop.stop();
+            }
+        }
 
         @Override
         public float estimateDps(){
             if(!hasAmmo()) return 0f;
             return shoot.shots / reload * 60f * (peekAmmo() == null ? 0f : peekAmmo().estimateDPS()) * potentialEfficiency * timeScale;
+        }
+
+        public float minRange(){
+            if(peekAmmo() != null){
+                return minRange + peekAmmo().minRangeChange;
+            }
+            return minRange;
         }
 
         @Override
@@ -380,8 +446,21 @@ public class Turret extends ReloadTurret{
         }
 
         @Override
+        public void drawSelect(){
+            super.drawSelect();
+
+            if(drawMinRange){
+                Drawf.dashCircle(x, y, minRange(), team.color);
+            }
+        }
+
+        @Override
         public void updateTile(){
             if(!validateTarget()) target = null;
+
+            if(soundLoop != null){
+                soundLoop.update(x, y, shouldActiveSound(), activeSoundVolume());
+            }
 
             float warmupTarget = (isShooting() && canConsume()) || charging() ? 1f : 0f;
             if(warmupTarget > 0 && !isControlled()){
@@ -423,6 +502,11 @@ public class Turret extends ReloadTurret{
                 heatReq = calculateHeat(sideHeat);
             }
 
+            if(rotate){
+                //sync underlying rotation; 0-3 rotation is a shadowed field
+                ((Building)this).rotation = Mathf.mod(Mathf.round(rotation / 90f), 4);
+            }
+
             //turret always reloads regardless of whether it's targeting something
             if(reloadWhileCharging || !charging()){
                 updateReload();
@@ -445,7 +529,7 @@ public class Turret extends ReloadTurret{
                 }
 
                 if(validateTarget()){
-                    boolean canShoot = true;
+                    boolean canShoot;
 
                     if(isControlled()){ //player behavior
                         targetPos.set(unit.aimX(), unit.aimY());
@@ -643,7 +727,7 @@ public class Turret extends ReloadTurret{
             bulletY = y + Angles.trnsy(rotation - 90, shootX + xOffset + xSpread, shootY + yOffset),
             shootAngle = rotation + angleOffset + Mathf.range(inaccuracy + type.inaccuracy);
 
-            float lifeScl = type.scaleLife ? Mathf.clamp((1 + scaleLifetimeOffset) * Mathf.dst(bulletX, bulletY, targetPos.x, targetPos.y) / type.range, minRange / type.range, range() / type.range) : 1f;
+            float lifeScl = type.scaleLife ? Mathf.clamp((1 + scaleLifetimeOffset) * Mathf.dst(bulletX, bulletY, targetPos.x, targetPos.y) / type.range, minRange() / type.range, range() / type.range) : 1f;
 
             //TODO aimX / aimY for multi shot turrets?
             handleBullet(type.create(this, team, bulletX, bulletY, shootAngle, -1f, (1f - velocityRnd) + Mathf.random(velocityRnd), lifeScl, null, mover, targetPos.x, targetPos.y), xOffset, yOffset, shootAngle - rotation);
@@ -678,12 +762,10 @@ public class Turret extends ReloadTurret{
 
         }
 
-        @Override
         public float activeSoundVolume(){
             return shootWarmup;
         }
 
-        @Override
         public boolean shouldActiveSound(){
             return shootWarmup > 0.01f && loopSound != Sounds.none;
         }

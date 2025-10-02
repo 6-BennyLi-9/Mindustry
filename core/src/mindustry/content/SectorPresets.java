@@ -1,5 +1,6 @@
 package mindustry.content;
 
+import mindustry.maps.*;
 import mindustry.type.*;
 
 import static mindustry.content.Planets.*;
@@ -8,7 +9,7 @@ public class SectorPresets{
     public static SectorPreset
     groundZero,
     craters, biomassFacility, taintedWoods, frozenForest, ruinousShores, facility32m, windsweptIslands, stainedMountains, tarFields,
-    frontier, fungalPass, infestedCanyons, atolls, mycelialBastion, extractionOutpost, saltFlats, testingGrounds, overgrowth, //polarAerodrome,
+    frontier, fungalPass, infestedCanyons, atolls, sunkenPier, mycelialBastion, extractionOutpost, saltFlats, testingGrounds, overgrowth, //polarAerodrome,
     impact0078, desolateRift, nuclearComplex, planetaryTerminal,
     coastline, navalFortress, weatheredChannels, seaPort,
 
@@ -106,12 +107,12 @@ public class SectorPresets{
             difficulty = 8;
         }};
 
-        frontier = new SectorPreset("frontier", serpulo, 203){{
+        frontier = new SectorPreset("frontier", serpulo, 50){{
             difficulty = 4;
         }};
 
         fungalPass = new SectorPreset("fungalPass", serpulo, 21){{
-            difficulty = 4;
+            difficulty = 2;
         }};
 
         infestedCanyons = new SectorPreset("infestedCanyons", serpulo, 210){{
@@ -120,6 +121,11 @@ public class SectorPresets{
 
         atolls = new SectorPreset("atolls", serpulo, 1){{
             difficulty = 7;
+        }};
+
+        sunkenPier = new SectorPreset("sunkenPier", serpulo, -1){{
+            captureWave = 50;
+            difficulty = 8;
         }};
 
         mycelialBastion = new SectorPreset("mycelialBastion", serpulo, 260){{
@@ -163,6 +169,8 @@ public class SectorPresets{
             difficulty = 10;
         }};
 
+        SectorSubmissions.registerSectors();
+
         //endregion
         //region erekir
 
@@ -186,11 +194,11 @@ public class SectorPresets{
             attackAfterWaves = true;
         }};
 
-        atlas = new SectorPreset("atlas", erekir, 14){{ //TODO random sector, pick a better one
+        atlas = new SectorPreset("atlas", erekir, 14){{
             difficulty = 5;
         }};
 
-        split = new SectorPreset("split", erekir, 19){{ //TODO random sector, pick a better one
+        split = new SectorPreset("split", erekir, 19){{
             difficulty = 2;
         }};
 

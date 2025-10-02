@@ -66,11 +66,7 @@ public class Planets{
             defaultCore = Blocks.coreBastion;
             iconColor = Color.valueOf("ff9266");
             enemyBuildSpeedMultiplier = 0.4f;
-
-            //TODO disallowed for now
             allowLaunchToNumbered = false;
-
-            //TODO SHOULD there be lighting?
             updateLighting = false;
 
             defaultAttributes.set(Attribute.heat, 0.8f);
@@ -87,6 +83,7 @@ public class Planets{
             };
             campaignRuleDefaults.fog = true;
             campaignRuleDefaults.showSpawns = true;
+            campaignRuleDefaults.rtsAI = true;
 
             unlockedOnLand.add(Blocks.coreBastion);
         }};
@@ -124,6 +121,7 @@ public class Planets{
         }};
 
         serpulo = new Planet("serpulo", sun, 1f, 3){{
+            loadPlanetData = true;
             generator = new SerpuloPlanetGenerator();
             meshLoader = () -> new HexMesh(this, 6);
             cloudMeshLoader = () -> new MultiMesh(
@@ -148,11 +146,12 @@ public class Planets{
                 r.showSpawns = false;
                 r.coreDestroyClear = true;
             };
+            showRtsAIRule = true;
             iconColor = Color.valueOf("7d4dff");
             atmosphereColor = Color.valueOf("3c1b8f");
             atmosphereRadIn = 0.02f;
             atmosphereRadOut = 0.3f;
-            startSector = 15;
+            startSector = 170;
             alwaysUnlocked = true;
             allowSelfSectorLaunch = true;
             landCloudColor = Pal.spore.cpy().a(0.5f);

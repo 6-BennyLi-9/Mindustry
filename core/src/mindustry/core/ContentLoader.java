@@ -43,9 +43,9 @@ public class ContentLoader{
     /** Creates all base types. */
     public void createBaseContent(){
         UnitCommand.loadAll();
-        UnitStance.loadAll();
         TeamEntries.load();
         Items.load();
+        UnitStance.loadAll(); //needs to access items
         StatusEffects.load();
         Liquids.load();
         Bullets.load();
@@ -212,6 +212,7 @@ public class ContentLoader{
     }
 
     public <T extends MappableContent> T getByName(ContentType type, String name){
+        if(name == null) return null;
         var map = contentNameMap[type.ordinal()];
 
         if(map == null) return null;
